@@ -1,0 +1,49 @@
+# Veröffentlicht Ballonalarm bei jedem Push auf "main" automatisch auf GitHub Pages.
+# Einmalig einschalten: Repository → Settings → Pages → Source: "GitHub Actions".
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Seite zusammenstellen
+        run: |
+          mkdir _site
+          tar --exclude=./.git --exclude=./.github --exclude=./_site --exclude=./supabase --exclude=./README.md --exclude=./netlify.toml -cf - . | tar -xf - -C _site
+          # Neue Cache-Version pro Commit, damit installierte Apps das Update sicher bekommen
+          sed -i -E "s/const VERSION = '[^']*';/const VERSION = 'ballonalarm-${GITHUB_SHA::8}';/" _site/sw.js
+          grep -q "ballonalarm-${GITHUB_SHA::8}" _site/sw.js
+
+      - name: Supabase-Zugang eintragen (falls hinterlegt)
+        if: ${{ vars.SUPABASE_URL != '' && vars.SUPABASE_KEY != '' }}
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ vars.SUPABASE_KEY }}
+        run: |
+          printf "window.BALLONALARM_CONFIG = { supabaseUrl: '%s', supabaseKey: '%s' };\n" "$SUPABASE_URL" "$SUPABASE_KEY" > _site/config.js
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

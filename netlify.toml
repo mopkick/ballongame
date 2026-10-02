@@ -1,0 +1,5 @@
+# Wird nur genutzt, wenn du Netlify mit dem GitHub-Repository verbindest.
+# Setzt bei jedem Deploy automatisch eine neue Cache-Version in sw.js.
+[build]
+  publish = "."
+  command = "sed -i -E \"s/const VERSION = '[^']*';/const VERSION = 'ballonalarm-${COMMIT_REF:0:8}';/\" sw.js"
