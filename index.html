@@ -349,14 +349,18 @@ function resize() {
 /* ---------- audio ---------- */
 let ac = null, master = null, musicGain = null, noiseBuf = null, muted = false;
 try { muted = localStorage.getItem('ballonalarm-muted') === '1'; } catch (e) {}
+function wake() { try { const r = ac.resume(); if (r && r.catch) r.catch(() => {}); } catch (e) {} }
 function audioInit() {
-  if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+  // iOS 17+: play like a game/media app, so the silent switch does not mute the page
+  try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch (e) {}
+  // iOS reports 'suspended' or 'interrupted' (e.g. after switching apps); any gesture brings it back
+  if (ac) { if (ac.state !== 'running') wake(); return; }
   try {
     ac = new (window.AudioContext || window.webkitAudioContext)();
     master = ac.createGain(); master.gain.value = muted ? 0 : 0.55; master.connect(ac.destination);
     musicGain = ac.createGain(); musicGain.gain.value = 0.32; musicGain.connect(master);
     const unlock = ac.createBufferSource(); unlock.buffer = ac.createBuffer(1, 1, 22050); unlock.connect(ac.destination); unlock.start(0);
-    if (ac.state === 'suspended') ac.resume();
+    if (ac.state !== 'running') wake();
     noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -994,7 +998,7 @@ $('resumeBtn').addEventListener('click', resumeGame);
 $('quitBtn').addEventListener('click', toMenu);
 $('muteBtn').addEventListener('click', () => { audioInit(); setMuted(!muted); });
 document.querySelectorAll('[data-sound]').forEach(b => b.addEventListener('click', () => { audioInit(); setMuted(!muted); }));
-['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, audioInit, { capture: true, passive: true }));
+['pointerdown', 'touchend', 'click', 'keydown'].forEach(ev => document.addEventListener(ev, audioInit, { capture: true, passive: true }));
 document.querySelectorAll('.btn').forEach(b => b.addEventListener('click', () => sfx.click()));
 
 addEventListener('keydown', e => {
