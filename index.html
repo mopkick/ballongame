@@ -146,6 +146,18 @@ body{background:var(--sky);color:var(--ink);font-family:var(--font-body);font-we
 .tick.out{opacity:0;transition:opacity .4s}
 @keyframes tickIn{from{transform:translateY(-8px);opacity:0}}
 .stats.four{grid-template-columns:repeat(4,1fr)}
+.invite{display:flex;align-items:center;gap:10px;flex-wrap:wrap;text-align:left;background:var(--ink);color:var(--paper);border-radius:14px;padding:10px 12px;box-shadow:0 4px 0 rgba(45,26,14,.35)}
+.invite-text{flex:1 1 170px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.invite-text b{font-family:var(--font-display);font-weight:400;font-size:19px;line-height:1.15;font-variant-numeric:tabular-nums}
+.invite-text span{font-size:13px;opacity:.85;line-height:1.35}
+.invite-actions{display:flex;gap:8px;flex-wrap:wrap}
+.ibtn{font-family:var(--font-display);font-size:18px;border:3px solid var(--paper);border-radius:12px;padding:6px 14px;cursor:pointer;background:var(--gold);color:var(--ink)}
+.ibtn.ghost{background:transparent;color:var(--paper)}
+.ibtn:active{transform:translateY(2px)}
+.ibtn:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.btn.alt{background:var(--leaf);font-size:22px}
+.countdown{position:fixed;inset:0;display:grid;place-items:center;z-index:30;pointer-events:none;font-family:var(--font-display);font-size:clamp(110px,38vw,250px);line-height:1;color:var(--gold);-webkit-text-stroke:6px var(--ink);paint-order:stroke fill;text-shadow:0 10px 0 var(--ink)}
+.match-box{display:flex;flex-direction:column;gap:6px}
 .nick{display:flex;flex-direction:column;gap:4px;text-align:left;font-size:12px;letter-spacing:.1em;text-transform:uppercase}
 .nick input{font-family:var(--font-display);font-size:20px;letter-spacing:0;text-transform:none;color:var(--ink);background:#fff;border:3px solid var(--ink);border-radius:12px;padding:8px 12px;width:100%;user-select:text;-webkit-user-select:text}
 .nick input:focus-visible{outline:4px solid var(--gold);outline-offset:2px}
@@ -197,11 +209,16 @@ body{background:var(--sky);color:var(--ink);font-family:var(--font-body);font-we
 </div>
 
 <div id="ticker" aria-live="polite"></div>
+<div id="countdown" class="countdown" hidden aria-live="assertive"></div>
 
 <div class="overlay" id="menu">
   <div class="panel">
     <h1 class="logo">Ballonalarm</h1>
     <p class="tag">90 Sekunden, 8 Schuss im Lauf und ein Himmel voller bunter Ballons. Gewertet wird in Treffern pro Minute.</p>
+    <div class="invite" data-invite hidden>
+      <div class="invite-text"><b class="inv-title"></b><span class="inv-sub"></span></div>
+      <div class="invite-actions"><button class="ibtn" data-act="join">Mitspielen</button><button class="ibtn" data-act="now">Jetzt starten</button><button class="ibtn ghost" data-act="leave">Verlassen</button></div>
+    </div>
     <div class="tabs" role="tablist">
       <button role="tab" data-tab="help" aria-selected="true">So geht's</button>
       <button role="tab" data-tab="board" aria-selected="false">Bestenliste</button>
@@ -233,6 +250,7 @@ body{background:var(--sky);color:var(--ink);font-family:var(--font-body);font-we
     </div>
     <label class="nick" id="nickWrap" hidden><span>Dein Spitzname</span><input id="nick" maxlength="20" autocomplete="nickname" placeholder="z. B. Luftikus" enterkeyhint="go"></label>
     <button class="btn" id="startBtn">Los geht's!</button>
+    <button class="btn alt" id="hostBtn" hidden>Gemeinsame Runde starten</button>
     <button class="sound-toggle" data-sound aria-pressed="true"><span class="knob"></span><span class="lbl">Ton an</span></button>
     <p class="best" id="bestMenu">Rekord: 0</p>
     <button class="install" id="installBtn" hidden>Als App installieren</button>
@@ -253,10 +271,15 @@ body{background:var(--sky);color:var(--ink);font-family:var(--font-body);font-we
 
 <div class="overlay" id="over" hidden>
   <div class="panel">
+    <div class="invite" data-invite hidden>
+      <div class="invite-text"><b class="inv-title"></b><span class="inv-sub"></span></div>
+      <div class="invite-actions"><button class="ibtn" data-act="join">Mitspielen</button><button class="ibtn" data-act="now">Jetzt starten</button><button class="ibtn ghost" data-act="leave">Verlassen</button></div>
+    </div>
     <p class="best">Zeit abgelaufen</p>
     <p class="rank" id="rank">Ballonschreck</p>
     <div class="big" id="finalScore">0</div>
     <div class="record" id="record" hidden>Neuer Rekord!</div>
+    <div class="match-box" id="matchBox" hidden><p class="best" id="matchTitle">Gemeinsame Runde</p><ol class="board" id="matchList"></ol></div>
     <div class="stats four">
       <div><b id="stHpm">0</b><span>Treffer/min</span></div>
       <div><b id="stSpm">0</b><span>Schüsse/min</span></div>
@@ -266,6 +289,7 @@ body{background:var(--sky);color:var(--ink);font-family:var(--font-body);font-we
     <p class="note" id="saveNote"></p>
     <ol class="board" id="boardMini"></ol>
     <button class="btn" id="againBtn">Nochmal!</button>
+    <button class="btn alt" id="hostBtn2" hidden>Gemeinsame Runde starten</button>
     <button class="sound-toggle" data-sound aria-pressed="true"><span class="knob"></span><span class="lbl">Ton an</span></button>
     <p class="best" id="bestOver">Rekord: 0</p>
   </div>
@@ -927,7 +951,8 @@ function setMuted(m) {
 }
 function showBest() { $('bestMenu').textContent = 'Rekord: ' + best; $('bestOver').textContent = 'Rekord: ' + best; }
 
-function startGame() {
+function startGame(fromMatch) {
+  if (fromMatch !== true && match) match = null; // solo start leaves any shared round
   audioInit(); sfx.start();
   state = 'play'; playedSecs = 0; score = 0; timeLeft = GAME_TIME; ammo = MAG; reloadT = 0; shots = 0; hits = 0; streak = 0; bestStreak = 0; lastMult = 1; lastTick = 99;
   birds = []; balloons = []; parts = []; spawnT = 0.3; popT = 4; balT = rand(14, 22);
@@ -951,14 +976,14 @@ function endGame() {
   $('rank').textContent = ranks.filter(r => score >= r[0]).pop()[1];
   showBest();
   $('over').hidden = false;
-  pushPresence(); pushFeat('hat ' + fmt(result.hpm) + ' Treffer/min geschafft (' + score + ' Punkte).');
+  pushPresence(true); if (hits > 0) pushFeat('hat ' + fmt(result.hpm) + ' Treffer/min geschafft (' + score + ' Punkte).');
   saveResult(result);
-  renderBoard();
+  renderBoard(); renderMatch(); renderInvite();
   setTimeout(() => $('againBtn').focus({ preventScroll: true }), 50);
 }
 function pauseGame() { if (state !== 'play') return; state = 'pause'; pushPresence(); $('pause').hidden = false; $('resumeBtn').focus({ preventScroll: true }); }
 function resumeGame() { if (state !== 'pause') return; state = 'play'; $('pause').hidden = true; audioInit(); pushPresence(); }
-function toMenu() { state = 'menu'; birds = []; balloons = []; parts = []; $('pause').hidden = true; $('over').hidden = true; $('hud').hidden = true; $('menu').hidden = false; showBest(); pushPresence(); }
+function toMenu() { match = null; state = 'menu'; birds = []; balloons = []; parts = []; $('pause').hidden = true; $('over').hidden = true; $('hud').hidden = true; $('menu').hidden = false; showBest(); pushPresence(); }
 
 /* ---------- input ---------- */
 let touchStart = null;
@@ -1096,17 +1121,21 @@ function row(list, pos, name, key, hpm, sub, me) {
 /* presence: what everyone in the lobby sees about you */
 function presenceState() {
   return { name: nick || 'Anonym', st: state, sc: score, hpm: state === 'play' || state === 'pause' ? round1(playedSecs >= 5 ? liveHpm() : 0) : null,
-    sec: Math.ceil(timeLeft), last: lastResult ? { hpm: lastResult.hpm, sc: lastResult.score } : null };
+    sec: Math.ceil(timeLeft), last: lastResult ? { hpm: lastResult.hpm, sc: lastResult.score } : null,
+    m: match ? { id: match.id, at: match.at, host: !!match.host } : null };
 }
-function pushPresence() {
-  if (!net.ch || !net.ready || net.trackTimer) return;
-  net.trackTimer = setTimeout(() => {
+function pushPresence(now) {
+  if (!net.ch || !net.ready) return;
+  const send = () => {
     net.trackTimer = 0;
     const p = presenceState(), key = JSON.stringify(p);
     if (key === net.lastTrack || !net.ready) return;
     net.lastTrack = key;
     net.ch.track(p).catch(() => {});
-  }, 700);
+  };
+  if (now === true) { clearTimeout(net.trackTimer); send(); return; }
+  if (net.trackTimer) return;
+  net.trackTimer = setTimeout(send, 700);
 }
 function pushFeat(txt) {
   if (!net.ch || !net.ready) return;
@@ -1165,7 +1194,8 @@ function renderLive() {
     const li = mk('li', p.isMe ? 'me' : '');
     li.append(avatar(p.name, p.id));
     const who = mk('div', 'who'); const b = mk('b', '', p.name + (p.isMe ? ' (du)' : ''));
-    b.append(mk('span', 'pill' + (p.st === 'play' ? ' play' : ''), { play: 'spielt', pause: 'Pause', over: 'fertig', menu: 'im Menü' }[p.st] || 'schaut zu'));
+    const waiting = p.m && p.m.at > Date.now() && p.st !== 'play';
+    b.append(mk('span', 'pill' + (p.st === 'play' ? ' play' : ''), waiting ? 'wartet auf Start' : ({ play: 'spielt', pause: 'Pause', over: 'fertig', menu: 'im Menü' }[p.st] || 'schaut zu')));
     who.append(b);
     let sub = '';
     if (p.st === 'play' || p.st === 'pause') sub = p.sc + ' Punkte · noch ' + Math.max(0, Math.round(p.sec)) + ' s';
@@ -1176,7 +1206,7 @@ function renderLive() {
     li.append(who, m); list.append(li);
   });
   const rv = $('rivals'); rv.replaceChildren();
-  peers.filter(p => !p.isMe && p.st === 'play').sort((a, b) => num(b.hpm) - num(a.hpm)).slice(0, 3).forEach(p => {
+  (match && match.started ? matchPlayers(match.id) : peers).filter(p => !p.isMe && p.st === 'play').sort((a, b) => num(b.hpm) - num(a.hpm)).slice(0, 3).forEach(p => {
     const d = mk('div', 'rival'); d.append(avatar(p.name, p.id), mk('span', '', p.name), mk('b', '', fmt(num(p.hpm)))); rv.append(d);
   });
 }
@@ -1186,10 +1216,120 @@ function readPeers() {
     const m = (metas && metas[metas.length - 1]) || {};
     return { id: key, isMe: key === net.uid, name: (typeof m.name === 'string' && m.name.trim().slice(0, 20)) || 'Anonym',
       st: typeof m.st === 'string' ? m.st : '', sc: num(m.sc), hpm: m.hpm == null ? null : num(m.hpm), sec: num(m.sec),
-      last: m.last && typeof m.last === 'object' ? { hpm: num(m.last.hpm) } : null };
+      last: m.last && typeof m.last === 'object' ? { hpm: num(m.last.hpm), sc: num(m.last.sc) } : null,
+      m: m.m && typeof m.m === 'object' && typeof m.m.id === 'string' && isFinite(m.m.at) ? { id: m.m.id.slice(0, 40), at: num(m.m.at), host: m.m.host === true } : null };
   });
-  renderLive();
+  renderLive(); renderMatch(); renderInvite();
 }
+/* shared round: one player invites, everyone who joins starts together */
+let match = null; // { id, at (start time, ms), host, started, missing }
+const MATCH_WAIT = 20000;
+let currentInvite = null, lastCountSec = null, lastInviteRender = 0;
+function matchPlayers(id) { return net.peers.filter(p => p.m && p.m.id === id); }
+function openInvite() {
+  const now = Date.now();
+  return net.peers.filter(p => !p.isMe && p.m && p.m.host && p.m.at > now - 1500 && p.m.at < now + 120000)
+    .sort((a, b) => a.m.at - b.m.at)[0] || null;
+}
+function hostMatch() {
+  if (!net.ready) { ticker('Lobby', 'ist gerade nicht erreichbar.'); return; }
+  audioInit(); sfx.click();
+  match = { id: Math.random().toString(36).slice(2, 10), at: Date.now() + MATCH_WAIT, host: true };
+  pushPresence(true); pushFeat('lädt zu einer gemeinsamen Runde ein!'); renderInvite();
+}
+function joinMatch(p) {
+  audioInit(); sfx.click();
+  match = { id: p.m.id, at: p.m.at, host: false };
+  pushPresence(true); renderInvite();
+}
+function leaveMatch() { match = null; pushPresence(true); renderInvite(); }
+function renderInvite() {
+  if (!ONLINE) return;
+  const now = Date.now(), idle = state === 'menu' || state === 'over';
+  $('hostBtn').hidden = $('hostBtn2').hidden = !(net.ready && (!match || match.started));
+  let title = '', sub = '', acts = [];
+  currentInvite = null;
+  if (match && !match.started) {
+    const ps = matchPlayers(match.id), n = Math.max(1, ps.length);
+    title = 'Gemeinsame Runde startet in ' + Math.max(0, Math.ceil((match.at - now) / 1000)) + ' s';
+    sub = n <= 1 ? (match.host ? 'Warte auf Mitspieler. Alle, die die Seite gerade offen haben, sehen deine Einladung.' : 'Du bist dabei.')
+      : n + ' Spieler dabei: ' + ps.map(p => p.isMe ? 'du' : p.name).join(', ');
+    acts = match.host ? ['now', 'leave'] : ['leave'];
+  } else if (idle) {
+    const inv = openInvite();
+    if (inv && (!match || inv.m.id !== match.id)) {
+      currentInvite = inv;
+      title = inv.name + ' lädt zu einer Runde ein';
+      sub = 'Start in ' + Math.max(0, Math.ceil((inv.m.at - now) / 1000)) + ' s · ' + matchPlayers(inv.m.id).length + ' dabei';
+      acts = ['join'];
+    }
+  }
+  document.querySelectorAll('[data-invite]').forEach(box => {
+    box.hidden = !title;
+    if (!title) return;
+    box.querySelector('.inv-title').textContent = title;
+    box.querySelector('.inv-sub').textContent = sub;
+    box.querySelectorAll('[data-act]').forEach(b => {
+      b.hidden = !acts.includes(b.dataset.act);
+      if (b.dataset.act === 'leave') b.textContent = match && match.host ? 'Absagen' : 'Verlassen';
+    });
+  });
+}
+function renderMatch() {
+  const box = $('matchBox');
+  if (!match || !match.started) { box.hidden = true; return; }
+  const ps = matchPlayers(match.id).map(p => p.isMe ? Object.assign({}, p, {
+    name: nick || 'Du', st: state, sc: score, hpm: state === 'over' ? null : round1(liveHpm()),
+    last: lastResult ? { hpm: lastResult.hpm, sc: lastResult.score } : null }) : p);
+  if (!ps.some(p => p.isMe)) ps.push({ id: net.uid, isMe: true, name: nick || 'Du', st: state, sc: score, hpm: null, last: lastResult ? { hpm: lastResult.hpm, sc: lastResult.score } : null });
+  const done = p => p.st === 'over' && p.last;
+  const val = p => done(p) ? p.last.hpm : num(p.hpm);
+  ps.sort((a, b) => (done(b) - done(a)) || (val(b) - val(a)));
+  const list = $('matchList'); list.replaceChildren();
+  ps.forEach((p, i) => row(list, i + 1, p.name, p.id, val(p),
+    done(p) ? p.last.sc + ' Punkte · fertig' : (p.st === 'play' || p.st === 'pause') ? p.sc + ' Punkte · spielt noch' : 'ausgestiegen', p.isMe));
+  $('matchTitle').textContent = ps.length > 1 ? 'Gemeinsame Runde · ' + ps.length + ' Spieler' : 'Gemeinsame Runde · nur du';
+  box.hidden = false;
+}
+function matchTick() {
+  if (!ONLINE) return;
+  const now = Date.now(), cd = $('countdown');
+  if (match && !match.host && !match.started) {
+    const h = net.peers.find(p => p.m && p.m.host && p.m.id === match.id);
+    if (h) { match.at = h.m.at; match.missing = 0; }
+    else {
+      // host gone (cancelled or left): give the lobby a moment to resync, then drop the round
+      match.missing = match.missing || now;
+      if (now - match.missing > 4000) { match = null; cd.hidden = true; pushPresence(true); ticker('Gemeinsame Runde', 'wurde abgesagt.'); }
+    }
+  }
+  if (match && !match.started) {
+    const rem = match.at - now;
+    if (rem <= 0) {
+      if (rem < -8000 || !(state === 'menu' || state === 'over')) { match = null; pushPresence(true); }
+      else {
+        match.started = true; lastCountSec = null;
+        cd.textContent = 'Los!'; cd.hidden = false; setTimeout(() => { if (cd.textContent === 'Los!') cd.hidden = true; }, 800);
+        startGame(true);
+        timeLeft = GAME_TIME - Math.min(5, -rem / 1000); updateTime();
+      }
+    } else if (rem <= 5000 && (state === 'menu' || state === 'over')) {
+      const sec = Math.ceil(rem / 1000);
+      if (sec !== lastCountSec) { lastCountSec = sec; cd.textContent = String(sec); cd.hidden = false; sfx.tick(); }
+    } else if (cd.textContent !== 'Los!') cd.hidden = true;
+  } else if (cd.textContent !== 'Los!') cd.hidden = true;
+  if (now - lastInviteRender > 250) { lastInviteRender = now; renderInvite(); }
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  if (b.dataset.act === 'join' && currentInvite) joinMatch(currentInvite);
+  else if (b.dataset.act === 'leave') leaveMatch();
+  else if (b.dataset.act === 'now' && match && match.host && !match.started) { match.at = Date.now() + 4000; pushPresence(true); renderInvite(); }
+});
+$('hostBtn').addEventListener('click', hostMatch);
+$('hostBtn2').addEventListener('click', hostMatch);
+
 function ticker(name, txt) {
   const box = $('ticker');
   const el = mk('div', 'tick'); el.append(mk('b', '', name), document.createTextNode(' ' + txt));
@@ -1210,7 +1350,7 @@ async function saveResult(r) {
     store.set('runs', runs.slice(0, 20));
   }
   if (!ONLINE) { renderBoard(); return; }
-  if (r.secs < 20) return;
+  if (r.secs < 20 || r.hits === 0) return;
   if (!net.uid) { note.textContent = 'Keine Verbindung zur Bestenliste. Deine Runde ist auf diesem Gerät gespeichert.'; return; }
   const prev = net.board.find(x => x.player_id === net.uid);
   try {
@@ -1288,6 +1428,7 @@ function frame(now) {
   if (state !== 'pause') update(dt);
   draw();
   musicTick();
+  matchTick();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
