@@ -158,6 +158,15 @@ body{background:var(--sky);color:var(--ink);font-family:var(--font-body);font-we
 .btn.alt{background:var(--leaf);font-size:22px}
 .countdown{position:fixed;inset:0;display:grid;place-items:center;z-index:30;pointer-events:none;font-family:var(--font-display);font-size:clamp(110px,38vw,250px);line-height:1;color:var(--gold);-webkit-text-stroke:6px var(--ink);paint-order:stroke fill;text-shadow:0 10px 0 var(--ink)}
 .match-box{display:flex;flex-direction:column;gap:6px}
+.mode-pick{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mode{display:flex;flex-direction:column;gap:4px;text-align:left;background:var(--paper-2);color:var(--ink);border:3px solid var(--ink);border-radius:14px;box-shadow:0 4px 0 var(--ink);padding:10px 12px;cursor:pointer;font:inherit}
+.mode b{font-family:var(--font-display);font-weight:400;font-size:19px;line-height:1.1}
+.mode span{font-size:12.5px;line-height:1.35}
+.mode:active{transform:translateY(3px);box-shadow:0 1px 0 var(--ink)}
+.mode:focus-visible{outline:4px solid var(--gold);outline-offset:2px}
+.mode.sky{background:#bfe7ff}
+.btn.ghost{background:var(--paper-2);color:var(--ink);font-size:20px}
+@media (max-width:420px){.mode-pick{grid-template-columns:1fr}}
 .nick{display:flex;flex-direction:column;gap:4px;text-align:left;font-size:12px;letter-spacing:.1em;text-transform:uppercase}
 .nick input{font-family:var(--font-display);font-size:20px;letter-spacing:0;text-transform:none;color:var(--ink);background:#fff;border:3px solid var(--ink);border-radius:12px;padding:8px 12px;width:100%;user-select:text;-webkit-user-select:text}
 .nick input:focus-visible{outline:4px solid var(--gold);outline-offset:2px}
@@ -193,6 +202,9 @@ body{background:var(--sky);color:var(--ink);font-family:var(--font-body);font-we
     </div>
     <div class="sign" id="timeSign"><small>Zeit</small><span id="time">90</span></div>
     <div class="right">
+      <button class="icon-btn" id="endBtn" aria-label="Runde beenden" title="Runde beenden">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
       <button class="icon-btn" id="pauseBtn" aria-label="Pause">
         <svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="5" height="16" rx="1.5"/><rect x="14" y="4" width="5" height="16" rx="1.5"/></svg>
       </button>
@@ -251,6 +263,10 @@ body{background:var(--sky);color:var(--ink);font-family:var(--font-body);font-we
     <label class="nick" id="nickWrap" hidden><span>Dein Spitzname</span><input id="nick" maxlength="20" autocomplete="nickname" placeholder="z. B. Luftikus" enterkeyhint="go"></label>
     <button class="btn" id="startBtn">Los geht's!</button>
     <button class="btn alt" id="hostBtn" hidden>Gemeinsame Runde starten</button>
+    <div class="mode-pick" data-modepick hidden>
+      <button class="mode sky" data-mode="sky"><b>Gemeinsamer Himmel</b><span>Alle sehen dieselben Ballons. Wer zuerst trifft, bekommt die Punkte. Ihr seht die Fadenkreuze der anderen.</span></button>
+      <button class="mode" data-mode="solo"><b>Jeder für sich</b><span>Gleicher Start, eigener Himmel. Wer schafft mehr Treffer pro Minute?</span></button>
+    </div>
     <button class="sound-toggle" data-sound aria-pressed="true"><span class="knob"></span><span class="lbl">Ton an</span></button>
     <p class="best" id="bestMenu">Rekord: 0</p>
     <button class="install" id="installBtn" hidden>Als App installieren</button>
@@ -265,7 +281,7 @@ body{background:var(--sky);color:var(--ink);font-family:var(--font-body);font-we
     <p class="tag">Die Ballons schweben so lange weiter.</p>
     <button class="btn" id="resumeBtn">Weiter</button>
     <button class="sound-toggle" data-sound aria-pressed="true"><span class="knob"></span><span class="lbl">Ton an</span></button>
-    <button class="btn" id="quitBtn" style="background:var(--paper-2);color:var(--ink);font-size:20px">Zum Menü</button>
+    <button class="btn ghost" id="quitBtn">Runde beenden</button>
   </div>
 </div>
 
@@ -290,6 +306,11 @@ body{background:var(--sky);color:var(--ink);font-family:var(--font-body);font-we
     <ol class="board" id="boardMini"></ol>
     <button class="btn" id="againBtn">Nochmal!</button>
     <button class="btn alt" id="hostBtn2" hidden>Gemeinsame Runde starten</button>
+    <div class="mode-pick" data-modepick hidden>
+      <button class="mode sky" data-mode="sky"><b>Gemeinsamer Himmel</b><span>Alle sehen dieselben Ballons. Wer zuerst trifft, bekommt die Punkte. Ihr seht die Fadenkreuze der anderen.</span></button>
+      <button class="mode" data-mode="solo"><b>Jeder für sich</b><span>Gleicher Start, eigener Himmel. Wer schafft mehr Treffer pro Minute?</span></button>
+    </div>
+    <button class="btn ghost" id="menuBtn">Zum Menü</button>
     <button class="sound-toggle" data-sound aria-pressed="true"><span class="knob"></span><span class="lbl">Ton an</span></button>
     <p class="best" id="bestOver">Rekord: 0</p>
   </div>
@@ -319,7 +340,7 @@ function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let
 /* ---------- state ---------- */
 let W = 0, H = 0, DPR = 1, U = 1, Lw = 1, worldW = 0, cam = 0;
 let state = 'menu';            // menu | play | pause | over
-let playedSecs = 0, score = 0, timeLeft = GAME_TIME, ammo = MAG, reloadT = 0, shots = 0, hits = 0, streak = 0, bestStreak = 0;
+let timeBonus = 0, playedSecs = 0, score = 0, timeLeft = GAME_TIME, ammo = MAG, reloadT = 0, shots = 0, hits = 0, streak = 0, bestStreak = 0;
 let birds = [], parts = [], balloons = [], sheep = null;
 let flash = 0, ambT = 2, spawnT = 0, popT = 3, balT = 18, T = 0, shake = 0, lastTick = 99;
 let clouds = [], trees = [], bushes = [], fence = [], tufts = [], windmill = null;
@@ -695,19 +716,26 @@ function update(dt) {
 
   const alive = birds.filter(b => b.alive && b.kind !== 'popup').length;
   if (state === 'play') {
-    timeLeft -= dt; playedSecs += dt;
+    if (match && match.started) {
+      // shared round: everyone runs on the host's clock, so pausing or lag never desyncs the timer
+      const el = Math.max(0, (hostNow() - match.at) / 1000);
+      playedSecs = el; timeLeft = GAME_TIME + timeBonus - el;
+    } else { timeLeft -= dt; playedSecs += dt; }
     const sec = Math.ceil(timeLeft);
     if (sec !== lastTick) { lastTick = sec; if (sec <= 10 && sec > 0) sfx.tick(); updateTime(); }
     if (timeLeft <= 0) { timeLeft = 0; endGame(); }
     if (reloadT > 0) { reloadT -= dt; if (reloadT <= 0) { reloadT = 0; ammo = MAG; updateAmmo(); } }
     const pr = progress();
-    spawnT -= dt;
-    if (spawnT <= 0) {
-      if (alive < 4 + Math.round(pr * 5)) { const r = Math.random(); spawnBird(r < 0.05 ? 'gold' : r < 0.13 ? 'storm' : 'normal'); }
-      spawnT = (0.85 - pr * 0.4) * rand(0.5, 1.4);
+    if (isShared()) { if (isSpawner()) hostSpawn(dt, pr); }
+    else {
+      spawnT -= dt;
+      if (spawnT <= 0) {
+        if (alive < 4 + Math.round(pr * 5)) { const r = Math.random(); spawnBird(r < 0.05 ? 'gold' : r < 0.13 ? 'storm' : 'normal'); }
+        spawnT = (0.85 - pr * 0.4) * rand(0.5, 1.4);
+      }
+      popT -= dt; if (popT <= 0) { spawnPopup(); popT = rand(3.5, 6.5) - pr * 1.5; }
+      balT -= dt; if (balT <= 0) { if (!balloons.length) spawnBalloon(); balT = rand(16, 26); }
     }
-    popT -= dt; if (popT <= 0) { spawnPopup(); popT = rand(3.5, 6.5) - pr * 1.5; }
-    balT -= dt; if (balT <= 0) { if (!balloons.length) spawnBalloon(); balT = rand(16, 26); }
     ambT -= dt; if (ambT <= 0) { if (birds.some(b => b.alive && b.seen)) sfx.squeak(); ambT = rand(2.5, 5); }
   } else if (state === 'menu') {
     spawnT -= dt;
@@ -715,6 +743,7 @@ function update(dt) {
   }
 
   for (const b of birds) {
+    if (b.net) { if (b.alive) netPos(b); continue; }
     b.t += dt; b.flap += dt * b.flapS * (b.alive ? 1 : 0.15);
     if (b.alive && b.kind === 'popup') {
       const up = 0.2, total = up * 2 + b.hold;
@@ -798,6 +827,7 @@ function draw() {
   drawParts(0);
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   drawEdgeHints();
+  drawGhosts();
   if (flash > 0) { ctx.fillStyle = 'rgba(255,255,230,' + (reduceMotion ? 0.15 : flash * 1.4) + ')'; ctx.fillRect(0, 0, W, H); }
   if (mouse.in && state === 'play') drawCrosshair(mouse.x, mouse.y);
 }
@@ -867,6 +897,7 @@ function shoot(sx, sy, touch) {
   ammo--; shots++; updateAmmo();
   sfx.shot(); shake = reduceMotion ? 0 : 7;
   parts.push({ type: 'puff', x: sx, y: sy, p: 0, life: 0, max: 0.28 });
+  netAim(sx, sy, true);
   const slack = touch ? 1.3 : 1.1, minR = touch ? 22 : 12;
   const hitBirds = [];
   for (const b of birds) {
@@ -885,7 +916,7 @@ function shoot(sx, sy, touch) {
   }
   if (hitBalloon) {
     hitBalloon.gone = true; balloons = balloons.filter(b => !b.gone);
-    timeLeft += 10; lastTick = 99; updateTime();
+    timeLeft += 10; timeBonus += 10; lastTick = 99; updateTime();
     sfx.pop();
     for (let i = 0; i < 12; i++) parts.push({ type: 'shard', x: hitBalloon.x, y: hitBalloon.y, p: 0.6, vx: rand(-1, 1) * U * 0.6, vy: rand(-1, 0.3) * U * 0.6, life: 0, max: 0.8, size: hitBalloon.R * 0.3, color: '#f4f1ea' });
     addText(sx, sy - U * 0.05, '+10 Sek!', '#8fd3ff', Math.max(24, U * 0.06));
@@ -893,6 +924,13 @@ function shoot(sx, sy, touch) {
   let gained = 0;
   for (const b of hitBirds) {
     b.alive = false; b.gone = true;
+    if (b.net) {
+      // shared sky: pop right away, points only once the host confirms we were first
+      burst(b, b.kind === 'gold' ? '#f2b705' : b.kind === 'storm' ? '#4a4f5c' : b.color);
+      sfx.popHit(1 + (2 - b.L) * 0.35);
+      claimNet(b, b.x - cam * LAYERS[b.L].p, b.y - b.R * 1.5);
+      continue;
+    }
     if (b.kind === 'storm') {
       burst(b, '#4a4f5c'); streak = 0; gained -= 50; flash = 0.35;
       sfx.thunder(); pushFeat('hat einen Gewitterballon erwischt. Autsch!');
@@ -907,7 +945,7 @@ function shoot(sx, sy, touch) {
     addText(bx, b.y - b.R * 1.5, '+' + pts, b.kind === 'gold' ? '#ffd84a' : '#fff4d6', b.kind === 'gold' ? Math.max(28, U * 0.07) : undefined);
     sfx.popHit(1 + (2 - b.L) * 0.35); if (b.kind === 'gold') { sfx.gold(); pushFeat('hat einen Goldballon erwischt!'); }
   }
-  const good = hitBirds.filter(b => b.kind !== 'storm').length;
+  const good = hitBirds.filter(b => b.kind !== 'storm' && !b.net).length;
   if (good > 1) { const bonus = 20 * (good - 1); gained += bonus; addText(sx, sy + U * 0.06, 'Doppeltreffer! +' + bonus, '#ffd84a', Math.max(20, U * 0.045)); }
   if (good) bestStreak = Math.max(bestStreak, streak);
   score = Math.max(0, score + gained); updateScore();
@@ -954,13 +992,13 @@ function showBest() { $('bestMenu').textContent = 'Rekord: ' + best; $('bestOver
 function startGame(fromMatch) {
   if (fromMatch !== true && match) match = null; // solo start leaves any shared round
   audioInit(); sfx.start();
-  state = 'play'; playedSecs = 0; score = 0; timeLeft = GAME_TIME; ammo = MAG; reloadT = 0; shots = 0; hits = 0; streak = 0; bestStreak = 0; lastMult = 1; lastTick = 99;
+  state = 'play'; playedSecs = 0; timeBonus = 0; score = 0; timeLeft = GAME_TIME; ammo = MAG; reloadT = 0; shots = 0; hits = 0; streak = 0; bestStreak = 0; lastMult = 1; lastTick = 99;
   birds = []; balloons = []; parts = []; spawnT = 0.3; popT = 4; balT = rand(14, 22);
   $('menu').hidden = true; $('over').hidden = true; $('pause').hidden = true; $('hud').hidden = false;
   updateAmmo(); updateScore(); updateTime(); pushPresence();
 }
 function endGame() {
-  state = 'over'; sfx.end();
+  state = 'over'; sfx.end(); $('pause').hidden = true;
   $('hud').hidden = true;
   const isRecord = score > best && score > 0;
   if (isRecord) { setTimeout(() => sfx.record(), 900); best = score; try { localStorage.setItem('ballonalarm-best', String(best)); } catch (e) {} }
@@ -981,7 +1019,7 @@ function endGame() {
   renderBoard(); renderMatch(); renderInvite();
   setTimeout(() => $('againBtn').focus({ preventScroll: true }), 50);
 }
-function pauseGame() { if (state !== 'play') return; state = 'pause'; pushPresence(); $('pause').hidden = false; $('resumeBtn').focus({ preventScroll: true }); }
+function pauseGame() { if (state !== 'play') return; state = 'pause'; pushPresence(true); $('pause').hidden = false; $('resumeBtn').focus({ preventScroll: true }); }
 function resumeGame() { if (state !== 'pause') return; state = 'play'; $('pause').hidden = true; audioInit(); pushPresence(); }
 function toMenu() { match = null; state = 'menu'; birds = []; balloons = []; parts = []; $('pause').hidden = true; $('over').hidden = true; $('hud').hidden = true; $('menu').hidden = false; showBest(); pushPresence(); }
 
@@ -998,7 +1036,7 @@ cv.addEventListener('pointerdown', e => {
   }
 });
 cv.addEventListener('pointermove', e => {
-  if (e.pointerType === 'mouse') { mouse.x = e.clientX; mouse.y = e.clientY; mouse.in = true; cv.classList.add('mouse'); return; }
+  if (e.pointerType === 'mouse') { mouse.x = e.clientX; mouse.y = e.clientY; mouse.in = true; cv.classList.add('mouse'); netAim(e.clientX, e.clientY, false); return; }
   if (!touchStart || touchStart.id !== e.pointerId) return;
   if (!touchStart.moved && Math.hypot(e.clientX - touchStart.x, e.clientY - touchStart.y) > 14) touchStart.moved = true;
   if (touchStart.moved) { cam = clamp(cam - (e.clientX - touchStart.lx) * 1.3, 0, worldW - W); }
@@ -1020,7 +1058,9 @@ $('startBtn').addEventListener('click', startGame);
 $('againBtn').addEventListener('click', startGame);
 $('pauseBtn').addEventListener('click', pauseGame);
 $('resumeBtn').addEventListener('click', resumeGame);
-$('quitBtn').addEventListener('click', toMenu);
+$('quitBtn').addEventListener('click', () => { if (state === 'pause' || state === 'play') endGame(); });
+$('endBtn').addEventListener('click', () => { if (state === 'play') endGame(); });
+$('menuBtn').addEventListener('click', toMenu);
 $('muteBtn').addEventListener('click', () => { audioInit(); setMuted(!muted); });
 document.querySelectorAll('[data-sound]').forEach(b => b.addEventListener('click', () => { audioInit(); setMuted(!muted); }));
 ['pointerdown', 'touchend', 'click', 'keydown'].forEach(ev => document.addEventListener(ev, audioInit, { capture: true, passive: true }));
@@ -1079,7 +1119,7 @@ const num = v => { const n = Number(v); return isFinite(n) ? n : 0; };
 function liveHpm() { return hits / (Math.max(playedSecs, 1) / 60); }
 const CFG = window.BALLONALARM_CONFIG || {};
 const ONLINE = !!(CFG.supabaseUrl && CFG.supabaseKey);
-const net = { sb: null, ch: null, uid: null, ready: false, error: false, board: [], boardReady: false, peers: [], lastTrack: '', trackTimer: 0 };
+const net = { seen: {}, lastJson: {}, sb: null, ch: null, uid: null, ready: false, error: false, board: [], boardReady: false, peers: [], lastTrack: '', trackTimer: 0 };
 let lastResult = null;
 const store = {
   get(k, d) { try { const v = localStorage.getItem('ballonalarm-' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
@@ -1122,7 +1162,8 @@ function row(list, pos, name, key, hpm, sub, me) {
 function presenceState() {
   return { name: nick || 'Anonym', st: state, sc: score, hpm: state === 'play' || state === 'pause' ? round1(playedSecs >= 5 ? liveHpm() : 0) : null,
     sec: Math.ceil(timeLeft), last: lastResult ? { hpm: lastResult.hpm, sc: lastResult.score } : null,
-    m: match ? { id: match.id, at: match.at, host: !!match.host } : null };
+    m: match ? { id: match.id, at: match.at, host: !!match.host, mode: match.mode } : null,
+    hb: Math.floor(Date.now() / 15000) };
 }
 function pushPresence(now) {
   if (!net.ch || !net.ready) return;
@@ -1183,8 +1224,13 @@ async function loadBoard() {
 }
 
 /* live lobby */
+function isStale(p) {
+  if (p.isMe) return false;
+  const age = Date.now() - (net.seen[p.id] || 0);
+  return p.st === 'away' ? age > 4000 : age > (p.st === 'play' ? 10000 : 45000);
+}
 function renderLive() {
-  const peers = net.peers;
+  const peers = net.peers.filter(p => !isStale(p));
   $('liveCount').textContent = String(Math.max(1, peers.length));
   const list = $('liveList'); list.replaceChildren();
   if (!net.ready) list.append(mk('p', 'empty', net.error ? 'Die Live-Lobby ist gerade nicht erreichbar.' : 'Verbinde mit der Lobby …'));
@@ -1195,7 +1241,7 @@ function renderLive() {
     li.append(avatar(p.name, p.id));
     const who = mk('div', 'who'); const b = mk('b', '', p.name + (p.isMe ? ' (du)' : ''));
     const waiting = p.m && p.m.at > Date.now() && p.st !== 'play';
-    b.append(mk('span', 'pill' + (p.st === 'play' ? ' play' : ''), waiting ? 'wartet auf Start' : ({ play: 'spielt', pause: 'Pause', over: 'fertig', menu: 'im Menü' }[p.st] || 'schaut zu')));
+    b.append(mk('span', 'pill' + (p.st === 'play' ? ' play' : ''), waiting ? 'wartet auf Start' : ({ play: 'spielt', pause: 'Pause', over: 'fertig', menu: 'im Menü', away: 'weg' }[p.st] || 'schaut zu')));
     who.append(b);
     let sub = '';
     if (p.st === 'play' || p.st === 'pause') sub = p.sc + ' Punkte · noch ' + Math.max(0, Math.round(p.sec)) + ' s';
@@ -1217,29 +1263,37 @@ function readPeers() {
     return { id: key, isMe: key === net.uid, name: (typeof m.name === 'string' && m.name.trim().slice(0, 20)) || 'Anonym',
       st: typeof m.st === 'string' ? m.st : '', sc: num(m.sc), hpm: m.hpm == null ? null : num(m.hpm), sec: num(m.sec),
       last: m.last && typeof m.last === 'object' ? { hpm: num(m.last.hpm), sc: num(m.last.sc) } : null,
-      m: m.m && typeof m.m === 'object' && typeof m.m.id === 'string' && isFinite(m.m.at) ? { id: m.m.id.slice(0, 40), at: num(m.m.at), host: m.m.host === true } : null };
+      m: m.m && typeof m.m === 'object' && typeof m.m.id === 'string' && isFinite(m.m.at) ? { id: m.m.id.slice(0, 40), at: num(m.m.at), host: m.m.host === true, mode: m.m.mode === 'sky' ? 'sky' : 'solo' } : null };
   });
+  // remember when each player last changed anything: frozen or closed apps stop updating
+  const now = Date.now();
+  for (const [key, metas] of Object.entries(st)) {
+    const j = JSON.stringify((metas && metas[metas.length - 1]) || {});
+    if (net.lastJson[key] !== j) { net.lastJson[key] = j; net.seen[key] = now; }
+  }
   renderLive(); renderMatch(); renderInvite();
 }
 /* shared round: one player invites, everyone who joins starts together */
 let match = null; // { id, at (start time, ms), host, started, missing }
 const MATCH_WAIT = 20000;
 let currentInvite = null, lastCountSec = null, lastInviteRender = 0;
-function matchPlayers(id) { return net.peers.filter(p => p.m && p.m.id === id); }
+function matchPlayers(id) { return net.peers.filter(p => p.m && p.m.id === id && !isStale(p)); }
 function openInvite() {
   const now = Date.now();
   return net.peers.filter(p => !p.isMe && p.m && p.m.host && p.m.at > now - 1500 && p.m.at < now + 120000)
     .sort((a, b) => a.m.at - b.m.at)[0] || null;
 }
-function hostMatch() {
+const MODE_NAMES = { sky: 'Gemeinsamer Himmel', solo: 'Jeder für sich' };
+function hostMatch(mode) {
   if (!net.ready) { ticker('Lobby', 'ist gerade nicht erreichbar.'); return; }
   audioInit(); sfx.click();
-  match = { id: Math.random().toString(36).slice(2, 10), at: Date.now() + MATCH_WAIT, host: true };
-  pushPresence(true); pushFeat('lädt zu einer gemeinsamen Runde ein!'); renderInvite();
+  document.querySelectorAll('[data-modepick]').forEach(el => { el.hidden = true; });
+  match = { id: Math.random().toString(36).slice(2, 10), at: Date.now() + MATCH_WAIT, host: true, mode: mode === 'sky' ? 'sky' : 'solo' };
+  pushPresence(true); pushFeat('lädt ein: ' + MODE_NAMES[match.mode] + '!'); renderInvite();
 }
 function joinMatch(p) {
   audioInit(); sfx.click();
-  match = { id: p.m.id, at: p.m.at, host: false };
+  match = { id: p.m.id, at: p.m.at, host: false, mode: p.m.mode };
   pushPresence(true); renderInvite();
 }
 function leaveMatch() { match = null; pushPresence(true); renderInvite(); }
@@ -1251,7 +1305,7 @@ function renderInvite() {
   currentInvite = null;
   if (match && !match.started) {
     const ps = matchPlayers(match.id), n = Math.max(1, ps.length);
-    title = 'Gemeinsame Runde startet in ' + Math.max(0, Math.ceil((match.at - now) / 1000)) + ' s';
+    title = MODE_NAMES[match.mode] + ' startet in ' + Math.max(0, Math.ceil((match.at - hostNow()) / 1000)) + ' s';
     sub = n <= 1 ? (match.host ? 'Warte auf Mitspieler. Alle, die die Seite gerade offen haben, sehen deine Einladung.' : 'Du bist dabei.')
       : n + ' Spieler dabei: ' + ps.map(p => p.isMe ? 'du' : p.name).join(', ');
     acts = match.host ? ['now', 'leave'] : ['leave'];
@@ -1259,7 +1313,7 @@ function renderInvite() {
     const inv = openInvite();
     if (inv && (!match || inv.m.id !== match.id)) {
       currentInvite = inv;
-      title = inv.name + ' lädt zu einer Runde ein';
+      title = inv.name + ' lädt ein: ' + MODE_NAMES[inv.m.mode];
       sub = 'Start in ' + Math.max(0, Math.ceil((inv.m.at - now) / 1000)) + ' s · ' + matchPlayers(inv.m.id).length + ' dabei';
       acts = ['join'];
     }
@@ -1288,7 +1342,7 @@ function renderMatch() {
   const list = $('matchList'); list.replaceChildren();
   ps.forEach((p, i) => row(list, i + 1, p.name, p.id, val(p),
     done(p) ? p.last.sc + ' Punkte · fertig' : (p.st === 'play' || p.st === 'pause') ? p.sc + ' Punkte · spielt noch' : 'ausgestiegen', p.isMe));
-  $('matchTitle').textContent = ps.length > 1 ? 'Gemeinsame Runde · ' + ps.length + ' Spieler' : 'Gemeinsame Runde · nur du';
+  $('matchTitle').textContent = MODE_NAMES[match.mode] + (ps.length > 1 ? ' · ' + ps.length + ' Spieler' : ' · nur du');
   box.hidden = false;
 }
 function matchTick() {
@@ -1303,8 +1357,10 @@ function matchTick() {
       if (now - match.missing > 4000) { match = null; cd.hidden = true; pushPresence(true); ticker('Gemeinsame Runde', 'wurde abgesagt.'); }
     }
   }
+  if (match && match.host && now - lastClk > 2000) { lastClk = now; netSend('clk', { mid: match.id, hn: now }); }
+  if (now - lastLiveRender > 2000) { lastLiveRender = now; renderLive(); renderMatch(); }
   if (match && !match.started) {
-    const rem = match.at - now;
+    const rem = match.at - hostNow();
     if (rem <= 0) {
       if (rem < -8000 || !(state === 'menu' || state === 'over')) { match = null; pushPresence(true); }
       else {
@@ -1327,8 +1383,157 @@ document.addEventListener('click', e => {
   else if (b.dataset.act === 'leave') leaveMatch();
   else if (b.dataset.act === 'now' && match && match.host && !match.started) { match.at = Date.now() + 4000; pushPresence(true); renderInvite(); }
 });
-$('hostBtn').addEventListener('click', hostMatch);
-$('hostBtn2').addEventListener('click', hostMatch);
+const toggleModes = e => { const pk = e.currentTarget.closest('.panel').querySelector('[data-modepick]'); pk.hidden = !pk.hidden; sfx.click(); if (!pk.hidden) pk.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' }); };
+$('hostBtn').addEventListener('click', toggleModes);
+$('hostBtn2').addEventListener('click', toggleModes);
+document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => hostMatch(b.dataset.mode)));
+
+/* shared sky: the host spawns, everyone sees the same balloons, first hit wins */
+let clockOff = 0, clockSet = false, lastClk = 0, lastLiveRender = 0, netSpawnT = 0, netSeq = 0, lastAimSent = 0;
+const pendingClaims = new Map(), poppedSids = new Set(), ghosts = new Map();
+function hostNow() { return Date.now() + (match && !match.host ? clockOff : 0); }
+function syncClock(hn) {
+  if (!isFinite(hn)) return;
+  const sample = hn - Date.now();
+  clockOff = clockSet ? clockOff * 0.8 + sample * 0.2 : sample; clockSet = true;
+}
+function isShared() { return !!(match && match.started && match.mode === 'sky'); }
+// The host spawns balloons and decides who hit first. If the host quits early, the
+// remaining player with the lowest id takes over so the sky never runs empty.
+function isSpawner() {
+  if (!isShared()) return false;
+  if (match.host) return true;
+  const ps = matchPlayers(match.id), h = ps.find(p => p.m.host);
+  if (h && h.st === 'play') return false;
+  const live = ps.filter(p => p.isMe ? state === 'play' : p.st === 'play').map(p => p.id).sort();
+  return live[0] === net.uid;
+}
+function netSend(event, payload) { if (net.ch && net.ready) net.ch.send({ type: 'broadcast', event, payload }).catch(() => {}); }
+function hostSpawn(dt, pr) {
+  netSpawnT -= dt;
+  if (netSpawnT > 0) return;
+  const players = Math.max(1, matchPlayers(match.id).length);
+  netSpawnT = (0.8 - pr * 0.35) * rand(0.5, 1.3) / Math.min(2, 1 + (players - 1) * 0.35);
+  const aliveNet = birds.filter(b => b.net && b.alive).length;
+  if (aliveNet >= Math.min(16, Math.round((5 + pr * 5) * (1 + (players - 1) * 0.3)))) return;
+  const r = Math.random(), k = r < 0.05 ? 'gold' : r < 0.13 ? 'storm' : 'normal';
+  const L = k === 'gold' ? 1 : pickLayer(), sc = LAYERS[L].scale;
+  const sp = { mid: match.id, id: match.id.slice(0, 4) + net.uid.slice(0, 4) + '-' + (++netSeq), k, L,
+    nx: round3(rand(0.04, 0.96)), ny: [0.8, 0.95, 1.1][L], vxn: round3(rand(-0.02, 0.02)),
+    vyn: round3(rand(0.08, 0.13) * (0.7 + sc * 0.5) * (1 + pr * 0.6) * (k === 'gold' ? 1.7 : 1)),
+    wobF: round3(rand(1.2, 2.6)), seed: round3(rand(0, 6)), rf: round3(rand(0.9, 1.1)),
+    ci: Math.floor(Math.random() * BALLOON_COLORS.length), t0: hostNow() };
+  addNetBird(sp);
+  netSend('sp', Object.assign({ hn: hostNow() }, sp));
+}
+function round3(v) { return Math.round(v * 1000) / 1000; }
+function addNetBird(sp) {
+  if (birds.some(b => b.sid === sp.id) || poppedSids.has(sp.id)) return;
+  const L = [0, 1, 2].includes(sp.L) ? sp.L : 1, kind = ['gold', 'storm'].includes(sp.k) ? sp.k : 'normal';
+  const b = { net: true, sid: String(sp.id).slice(0, 24), kind, L, nx: num(sp.nx), ny: num(sp.ny), vxn: clamp(num(sp.vxn), -0.1, 0.1), vyn: clamp(num(sp.vyn), 0.02, 0.5),
+    wobF: clamp(num(sp.wobF), 0.5, 4), seed: num(sp.seed), rf: clamp(num(sp.rf), 0.8, 1.2), color: BALLOON_COLORS[Math.abs(Math.floor(num(sp.ci))) % BALLOON_COLORS.length],
+    t0: num(sp.t0), x: -9999, y: H * 2, R: 1, t: 0, alive: true, seen: true };
+  netPos(b); birds.push(b);
+  if (kind === 'gold') sfx.shimmer();
+}
+function netPos(b) {
+  const e = (hostNow() - b.t0) / 1000, lay = LAYERS[b.L];
+  b.t = e;
+  b.R = U * 0.06 * lay.scale * b.rf;
+  b.x = (b.nx + b.vxn * e) * extent(lay.p) + Math.sin(e * b.wobF + b.seed) * b.R * 0.6;
+  b.y = (b.ny - b.vyn * e) * H + Math.sin(e * b.wobF * 0.7) * b.R * 0.25;
+  if (b.y < -b.R * 3 || e > 40) b.gone = true;
+  if (b.kind === 'gold' && Math.random() < 0.25) parts.push({ type: 'spark', x: b.x, y: b.y + b.R, p: lay.p, vx: 0, vy: U * 0.05, life: 0, max: 0.6, size: b.R * 0.18 });
+}
+function claimNet(b, tx, ty) {
+  const info = { k: b.kind, L: b.L, x: tx, y: ty };
+  if (isSpawner()) resolveClaim(b.sid, net.uid, nick || 'Anonym', info);
+  else {
+    pendingClaims.set(b.sid, info);
+    netSend('cl', { mid: match.id, id: b.sid, by: net.uid, name: nick || 'Anonym' });
+    setTimeout(() => pendingClaims.delete(b.sid), 3000);
+  }
+}
+function resolveClaim(sid, by, name, info) {        // spawner only
+  if (poppedSids.has(sid)) return;
+  if (!birds.some(q => q.sid === sid)) return;
+  const msg = { mid: match.id, id: sid, by, name, hn: hostNow() };
+  netSend('pp', msg);
+  applyPop(msg, info);
+}
+function applyPop(msg, info) {
+  poppedSids.add(msg.id);
+  const b = birds.find(q => q.sid === msg.id);
+  if (b && b.alive) { b.alive = false; b.gone = true; burst(b, b.kind === 'gold' ? '#f2b705' : b.kind === 'storm' ? '#4a4f5c' : b.color); }
+  if (msg.by === net.uid) {
+    const pc = info || pendingClaims.get(msg.id);
+    pendingClaims.delete(msg.id);
+    if (pc) awardNet(pc);
+  } else {
+    pendingClaims.delete(msg.id);
+    if (b && state === 'play') addText(b.x - cam * LAYERS[b.L].p, b.y - b.R * 1.4, String(msg.name || 'Jemand').slice(0, 20), colorFor(msg.by), Math.max(16, U * 0.035));
+  }
+}
+function awardNet(pc) {
+  if (state !== 'play' && state !== 'pause') return;
+  if (pc.k === 'storm') {
+    score = Math.max(0, score - 50); streak = 0; flash = 0.35; sfx.thunder();
+    addText(pc.x, pc.y, 'Gewitter! −50', '#ff8a7a', Math.max(22, U * 0.055));
+    pushFeat('hat einen Gewitterballon erwischt. Autsch!');
+  } else {
+    streak++; hits++; bestStreak = Math.max(bestStreak, streak);
+    const pts = (pc.k === 'gold' ? 100 : LAYERS[pc.L].pts) * mult();
+    score += pts;
+    addText(pc.x, pc.y, '+' + pts, pc.k === 'gold' ? '#ffd84a' : '#fff4d6', pc.k === 'gold' ? Math.max(28, U * 0.07) : undefined);
+    if (pc.k === 'gold') { sfx.gold(); pushFeat('hat sich den Goldballon geschnappt!'); }
+  }
+  updateScore();
+}
+function netAim(sx, sy, shot) {
+  if (!isShared() || state !== 'play') return;
+  const now = Date.now();
+  if (!shot && now - lastAimSent < 200) return;
+  lastAimSent = now;
+  netSend('aim', { mid: match.id, by: net.uid, name: nick || 'Anonym', x: round3((sx + cam) / worldW), y: round3(sy / H), s: shot ? 1 : 0 });
+}
+function drawGhosts() {
+  if (!isShared() || state !== 'play') return;
+  const now = Date.now();
+  for (const [id, g] of ghosts) {
+    const age = now - g.t;
+    if (age > 2500) continue;
+    const x = g.x * worldW - cam, y = g.y * H, r = Math.max(14, U * 0.026), col = colorFor(id);
+    ctx.save(); ctx.globalAlpha = age > 1500 ? 1 - (age - 1500) / 1000 : 1;
+    ctx.lineWidth = 3; ctx.strokeStyle = INK; circ(ctx, x, y, r); ctx.stroke();
+    ctx.lineWidth = 2; ctx.strokeStyle = col; circ(ctx, x, y, r); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - r * 1.4, y); ctx.lineTo(x - r * 0.5, y); ctx.moveTo(x + r * 0.5, y); ctx.lineTo(x + r * 1.4, y);
+    ctx.moveTo(x, y - r * 1.4); ctx.lineTo(x, y - r * 0.5); ctx.moveTo(x, y + r * 0.5); ctx.lineTo(x, y + r * 1.4); ctx.stroke();
+    const sa = now - g.shotT;
+    if (sa < 350) { ctx.globalAlpha = 1 - sa / 350; ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; circ(ctx, x, y, r * (1 + sa / 120)); ctx.stroke(); }
+    ctx.globalAlpha = age > 1500 ? 1 - (age - 1500) / 1000 : 1;
+    ctx.font = '700 13px "Nunito", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.strokeText(g.name, x, y + r * 1.6); ctx.fillStyle = col; ctx.fillText(g.name, x, y + r * 1.6);
+    ctx.restore();
+  }
+}
+function onNet(event, d) {
+  if (!d || typeof d !== 'object' || !match || d.mid !== match.id) return;
+  if (event === 'clk') { if (!match.host) syncClock(num(d.hn)); return; }
+  if (!isShared() && event !== 'sp') return;
+  if (event === 'sp') { if (!match.host) syncClock(num(d.hn)); if (match.started && match.mode === 'sky' && typeof d.id === 'string') addNetBird(d); }
+  else if (event === 'cl') { if (isSpawner() && typeof d.id === 'string' && typeof d.by === 'string') resolveClaim(d.id, d.by, String(d.name || 'Anonym').slice(0, 20), null); }
+  else if (event === 'pp') { if (typeof d.id === 'string' && typeof d.by === 'string' && !poppedSids.has(d.id)) { if (!match.host) syncClock(num(d.hn)); applyPop(d, null); } }
+  else if (event === 'aim') { if (typeof d.by === 'string' && d.by !== net.uid) { const g = ghosts.get(d.by) || { shotT: 0 };
+    ghosts.set(d.by, { name: String(d.name || 'Anonym').slice(0, 20), x: clamp(num(d.x), -0.2, 1.2), y: clamp(num(d.y), -0.2, 1.2), t: Date.now(), shotT: d.s ? Date.now() : g.shotT }); } }
+}
+// leaving the app: tell the lobby right away instead of looking like "spielt" for minutes
+document.addEventListener('visibilitychange', () => {
+  if (!net.ch || !net.ready) return;
+  if (document.hidden) { clearTimeout(net.trackTimer); net.trackTimer = 0; const p = presenceState(); p.st = 'away'; net.lastTrack = JSON.stringify(p); net.ch.track(p).catch(() => {}); }
+  else pushPresence(true);
+});
+addEventListener('pagehide', () => { try { net.ch && net.ch.untrack(); } catch (e) {} });
+setInterval(() => pushPresence(), 5000);
 
 function ticker(name, txt) {
   const box = $('ticker');
@@ -1403,6 +1608,7 @@ async function initOnline() {
     net.uid = deviceIdentity().id;
     loadBoard();
     const ch = net.ch = sb.channel('lobby', { config: { presence: { key: net.uid } } });
+    ['sp', 'cl', 'pp', 'aim', 'clk'].forEach(ev => ch.on('broadcast', { event: ev }, msg => onNet(ev, msg && msg.payload)));
     ch.on('presence', { event: 'sync' }, readPeers)
       .on('broadcast', { event: 'feat' }, msg => {
         const p = (msg && msg.payload) || {};
@@ -1419,6 +1625,12 @@ async function initOnline() {
   }
 }
 initOnline();
+// test hook, only with #debug in the address
+if (location.hash === '#debug') window.__dbg = {
+  birds: () => birds.filter(b => b.alive).map(b => ({ sid: b.sid, x: b.x - cam * LAYERS[b.L].p, y: b.y, R: b.R, k: b.kind })),
+  score: () => score, hits: () => hits, ghosts: () => ghosts.size, state: () => state, spawner: () => isSpawner(),
+  peers: () => net.peers.map(p => ({ n: p.name, st: p.st, stale: isStale(p) })), time: () => Math.ceil(timeLeft)
+};
 
 /* ---------- boot ---------- */
 setMuted(muted); showBest(); resize();
