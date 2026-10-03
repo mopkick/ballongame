@@ -62,11 +62,14 @@ Alle drei Varianten sind kostenlos und liefern automatisch HTTPS, was für die A
 Ohne Online-Modus ist Ballonalarm ein Einzelspieler-Spiel mit einer Bestenliste der eigenen Runden auf dem Gerät.
 Mit Online-Modus gibt es eine gemeinsame Bestenliste und eine Live-Lobby: Alle sehen, wer gerade spielt, und bekommen Meldungen wie „Lena hat einen Goldballon erwischt!“.
 
-1. Kostenloses Projekt auf https://supabase.com anlegen. **Region in der EU wählen** (z. B. Frankfurt).
-2. *Authentication* → Einstellungen zu Sign-In/Providers → **Anonymous Sign-Ins erlauben**. Spieler brauchen damit kein Konto und keine E-Mail.
-3. *SQL Editor* → Inhalt von `supabase/schema.sql` einfügen → *Run*.
-4. Projekt-URL und **Publishable Key** (bei älteren Projekten: *anon public* Key) kopieren. Beide findest du über den Button *Connect* oder unter *Project Settings → API Keys*.
-5. Beide Werte in `config.js` eintragen und den Ordner neu hochladen.
+> **Status:** Für dieses Repository ist der Online-Modus bereits eingerichtet (Supabase-Projekt `biwjtdoozzglimhbkveq`, Region eu-west-1). Die Schritte unten brauchst du nur für ein neues Projekt.
+
+1. Kostenloses Projekt auf https://supabase.com anlegen. **Region in der EU wählen**.
+2. *SQL Editor* → Inhalt von `supabase/schema.sql` einfügen → *Run*.
+3. Projekt-URL und **Publishable Key** kopieren. Beide findest du über den Button *Connect* oder unter *Project Settings → API Keys*.
+4. Beide Werte in `config.js` eintragen und pushen.
+
+Ein Login ist nicht nötig: Jedes Gerät erzeugt beim ersten Start eine zufällige Spieler-ID und einen geheimen Spieler-Schlüssel. Der Server speichert davon nur einen Hash, sodass niemand fremde Einträge verändern kann.
    Bei Variante C kannst du `config.js` leer lassen und die Werte stattdessen im Repository unter *Settings → Secrets and variables → Actions → Variables* als `SUPABASE_URL` und `SUPABASE_KEY` hinterlegen. Der Workflow trägt sie beim Veröffentlichen ein.
 
 ```js
@@ -76,12 +79,12 @@ window.BALLONALARM_CONFIG = {
 };
 ```
 
-Der Publishable/anon Key ist dafür gedacht, öffentlich im Browser zu stehen. Die Datenbank ist so abgesichert, dass jeder nur lesen und Ergebnisse ausschließlich über die Prüf-Funktion `submit_result` eintragen kann.
+Der Publishable/anon Key ist dafür gedacht, öffentlich im Browser zu stehen. Die Datenbank ist so abgesichert, dass jeder nur lesen und Ergebnisse ausschließlich über die Prüf-Funktion `submit_result` eintragen kann, höchstens eins alle 15 Sekunden pro Spieler.
 **Den `secret`- oder `service_role`-Key niemals in `config.js` eintragen.**
 
 Gut zu wissen:
 - Gewertet wird die beste Runde pro Person nach Treffern pro Minute. Runden unter 20 Sekunden zählen nicht.
-- Die Werte rechnet der Server aus und lehnt unmögliche Ergebnisse ab. Weil das Spiel im Browser läuft, kann jemand mit technischem Wissen trotzdem schummeln. Für ein Spiel unter Freunden reicht der Schutz. Einzelne Einträge löschst du im Supabase-Dashboard unter *Table Editor → scores*.
+- Die Werte rechnet der Server aus und lehnt unmögliche Ergebnisse ab. Weil das Spiel im Browser läuft, kann jemand mit technischem Wissen trotzdem schummeln. Für ein Spiel unter Freunden reicht der Schutz. Einzelne Einträge löschst du im Supabase-Dashboard unter *Table Editor → players* (der Bestenlisten-Eintrag verschwindet automatisch mit).
 - Wenn die Live-Lobby nicht erscheint, prüfe in Supabase unter *Realtime → Settings*, ob öffentliche Kanäle erlaubt sind.
 
 ## 4. Updates veröffentlichen

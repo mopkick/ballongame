@@ -1061,6 +1061,18 @@ const store = {
   set(k, v) { try { localStorage.setItem('ballonalarm-' + k, JSON.stringify(v)); } catch (e) {} }
 };
 let nick = String(store.get('nick', '') || '').slice(0, 20);
+// Device identity for the leaderboard: a random player id plus a secret only this device knows
+function deviceIdentity() {
+  let me = store.get('player', null);
+  const ok = me && /^[0-9a-f-]{36}$/.test(me.id) && typeof me.token === 'string' && me.token.length >= 32;
+  if (!ok) {
+    const bytes = new Uint8Array(32); crypto.getRandomValues(bytes);
+    const id = crypto.randomUUID ? crypto.randomUUID() : ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
+    me = { id, token: Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('') };
+    store.set('player', me);
+  }
+  return me;
+}
 
 function mk(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function colorFor(key) {
@@ -1202,7 +1214,8 @@ async function saveResult(r) {
   if (!net.uid) { note.textContent = 'Keine Verbindung zur Bestenliste. Deine Runde ist auf diesem Gerät gespeichert.'; return; }
   const prev = net.board.find(x => x.player_id === net.uid);
   try {
-    const { error } = await net.sb.rpc('submit_result', { p_name: nick || 'Anonym', p_hits: r.hits, p_shots: r.shots, p_secs: r.secs, p_score: r.score });
+    const me = deviceIdentity();
+    const { error } = await net.sb.rpc('submit_result', { p_player: me.id, p_token: me.token, p_name: nick || 'Anonym', p_hits: r.hits, p_shots: r.shots, p_secs: r.secs, p_score: r.score });
     if (error) throw error;
     if (!prev) { note.textContent = 'Du stehst jetzt in der Bestenliste!'; pushFeat('steht jetzt mit ' + fmt(r.hpm) + ' Treffer/min in der Bestenliste!'); }
     else if (r.hpm > num(prev.hpm)) { note.textContent = 'Neue persönliche Bestmarke in der Bestenliste!'; pushFeat('hat eine neue Bestmarke: ' + fmt(r.hpm) + ' Treffer/min!'); }
@@ -1246,16 +1259,9 @@ async function initOnline() {
   renderBoard(); renderLive();
   try {
     await loadScript('vendor/supabase.js');
-    const sb = net.sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'ballonalarm-auth' } });
+    const sb = net.sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+    net.uid = deviceIdentity().id;
     loadBoard();
-    let { data: { session } } = await sb.auth.getSession();
-    if (!session) {
-      const res = await sb.auth.signInAnonymously();
-      if (res.error) throw res.error;
-      session = res.data.session;
-    }
-    net.uid = session.user.id;
-    renderBoard();
     const ch = net.ch = sb.channel('lobby', { config: { presence: { key: net.uid } } });
     ch.on('presence', { event: 'sync' }, readPeers)
       .on('broadcast', { event: 'feat' }, msg => {
