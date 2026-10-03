@@ -1119,7 +1119,7 @@ const num = v => { const n = Number(v); return isFinite(n) ? n : 0; };
 function liveHpm() { return hits / (Math.max(playedSecs, 1) / 60); }
 const CFG = window.BALLONALARM_CONFIG || {};
 const ONLINE = !!(CFG.supabaseUrl && CFG.supabaseKey);
-const net = { seen: {}, lastJson: {}, sb: null, ch: null, uid: null, ready: false, error: false, board: [], boardReady: false, peers: [], lastTrack: '', trackTimer: 0 };
+const net = { seen: {}, lastJson: {}, live: {}, invites: new Map(), sb: null, ch: null, uid: null, ready: false, error: false, board: [], boardReady: false, peers: [], lastTrack: '', trackTimer: 0 };
 let lastResult = null;
 const store = {
   get(k, d) { try { const v = localStorage.getItem('ballonalarm-' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
@@ -1159,11 +1159,11 @@ function row(list, pos, name, key, hpm, sub, me) {
 }
 
 /* presence: what everyone in the lobby sees about you */
+// Presence carries only slow-changing state (who, which screen, which round).
+// Supabase rate-limits presence per client, so live numbers travel as broadcasts.
 function presenceState() {
-  return { name: nick || 'Anonym', st: state, sc: score, hpm: state === 'play' || state === 'pause' ? round1(playedSecs >= 5 ? liveHpm() : 0) : null,
-    sec: Math.ceil(timeLeft), last: lastResult ? { hpm: lastResult.hpm, sc: lastResult.score } : null,
-    m: match ? { id: match.id, at: match.at, host: !!match.host, mode: match.mode } : null,
-    hb: Math.floor(Date.now() / 15000) };
+  return { name: nick || 'Anonym', st: state, last: lastResult ? { hpm: lastResult.hpm, sc: lastResult.score } : null,
+    m: match ? { id: match.id, host: !!match.host, mode: match.mode } : null };
 }
 function pushPresence(now) {
   if (!net.ch || !net.ready) return;
@@ -1176,7 +1176,7 @@ function pushPresence(now) {
   };
   if (now === true) { clearTimeout(net.trackTimer); send(); return; }
   if (net.trackTimer) return;
-  net.trackTimer = setTimeout(send, 700);
+  net.trackTimer = setTimeout(send, 1500);
 }
 function pushFeat(txt) {
   if (!net.ch || !net.ready) return;
@@ -1226,8 +1226,18 @@ async function loadBoard() {
 /* live lobby */
 function isStale(p) {
   if (p.isMe) return false;
-  const age = Date.now() - (net.seen[p.id] || 0);
-  return p.st === 'away' ? age > 4000 : age > (p.st === 'play' ? 10000 : 45000);
+  if (p.st === 'away') return Date.now() - (net.seen[p.id] || 0) > 4000;
+  if (p.st !== 'play') return false;
+  // a player in a round sends live numbers every 2 s; silence means the app is gone or frozen
+  const l = net.live[p.id];
+  return Date.now() - Math.max(l ? l.t : 0, net.seen[p.id] || 0) > 10000;
+}
+function mergeLive() {
+  for (const p of net.peers) {
+    if (p.isMe) { p.sc = score; p.hpm = round1(playedSecs >= 5 ? liveHpm() : 0); p.sec = Math.ceil(timeLeft); continue; }
+    const l = net.live[p.id];
+    if (l) { p.sc = l.sc; p.hpm = l.hpm; p.sec = l.sec; }
+  }
 }
 function renderLive() {
   const peers = net.peers.filter(p => !isStale(p));
@@ -1240,7 +1250,7 @@ function renderLive() {
     const li = mk('li', p.isMe ? 'me' : '');
     li.append(avatar(p.name, p.id));
     const who = mk('div', 'who'); const b = mk('b', '', p.name + (p.isMe ? ' (du)' : ''));
-    const waiting = p.m && p.m.at > Date.now() && p.st !== 'play';
+    const waiting = p.m && p.st !== 'play' && (net.invites.has(p.m.id) || (match && match.id === p.m.id && !match.started));
     b.append(mk('span', 'pill' + (p.st === 'play' ? ' play' : ''), waiting ? 'wartet auf Start' : ({ play: 'spielt', pause: 'Pause', over: 'fertig', menu: 'im Menü', away: 'weg' }[p.st] || 'schaut zu')));
     who.append(b);
     let sub = '';
@@ -1261,9 +1271,9 @@ function readPeers() {
   net.peers = Object.entries(st).map(([key, metas]) => {
     const m = (metas && metas[metas.length - 1]) || {};
     return { id: key, isMe: key === net.uid, name: (typeof m.name === 'string' && m.name.trim().slice(0, 20)) || 'Anonym',
-      st: typeof m.st === 'string' ? m.st : '', sc: num(m.sc), hpm: m.hpm == null ? null : num(m.hpm), sec: num(m.sec),
+      st: typeof m.st === 'string' ? m.st : '', sc: 0, hpm: null, sec: 0,
       last: m.last && typeof m.last === 'object' ? { hpm: num(m.last.hpm), sc: num(m.last.sc) } : null,
-      m: m.m && typeof m.m === 'object' && typeof m.m.id === 'string' && isFinite(m.m.at) ? { id: m.m.id.slice(0, 40), at: num(m.m.at), host: m.m.host === true, mode: m.m.mode === 'sky' ? 'sky' : 'solo' } : null };
+      m: m.m && typeof m.m === 'object' && typeof m.m.id === 'string' ? { id: m.m.id.slice(0, 40), host: m.m.host === true, mode: m.m.mode === 'sky' ? 'sky' : 'solo' } : null };
   });
   // remember when each player last changed anything: frozen or closed apps stop updating
   const now = Date.now();
@@ -1271,17 +1281,27 @@ function readPeers() {
     const j = JSON.stringify((metas && metas[metas.length - 1]) || {});
     if (net.lastJson[key] !== j) { net.lastJson[key] = j; net.seen[key] = now; }
   }
-  renderLive(); renderMatch(); renderInvite();
+  mergeLive(); renderLive(); renderMatch(); renderInvite();
 }
 /* shared round: one player invites, everyone who joins starts together */
 let match = null; // { id, at (start time, ms), host, started, missing }
 const MATCH_WAIT = 20000;
-let currentInvite = null, lastCountSec = null, lastInviteRender = 0;
+let currentInvite = null, lastCountSec = null, lastInviteRender = 0, lastInv = 0, lastLiveSent = 0;
 function matchPlayers(id) { return net.peers.filter(p => p.m && p.m.id === id && !isStale(p)); }
+// Invitations are re-broadcast by the host every 1.5 s, so latecomers see them too
+// and a host who vanished simply stops inviting.
 function openInvite() {
-  const now = Date.now();
-  return net.peers.filter(p => !p.isMe && p.m && p.m.host && p.m.at > now - 1500 && p.m.at < now + 120000)
-    .sort((a, b) => a.m.at - b.m.at)[0] || null;
+  const now = Date.now(); let best = null;
+  for (const v of net.invites.values()) {
+    if (now - v.t > 4500 || v.at - (now + v.off) < -1500) continue;
+    if (!best || v.at < best.at) best = v;
+  }
+  return best;
+}
+function sendInvite() {
+  if (!match || !match.host || match.started) return;
+  lastInv = Date.now();
+  netSend('inv', { mid: match.id, mode: match.mode, name: nick || 'Anonym', by: net.uid, at: match.at, hn: Date.now() });
 }
 const MODE_NAMES = { sky: 'Gemeinsamer Himmel', solo: 'Jeder für sich' };
 function hostMatch(mode) {
@@ -1289,14 +1309,18 @@ function hostMatch(mode) {
   audioInit(); sfx.click();
   document.querySelectorAll('[data-modepick]').forEach(el => { el.hidden = true; });
   match = { id: Math.random().toString(36).slice(2, 10), at: Date.now() + MATCH_WAIT, host: true, mode: mode === 'sky' ? 'sky' : 'solo' };
-  pushPresence(true); pushFeat('lädt ein: ' + MODE_NAMES[match.mode] + '!'); renderInvite();
+  sendInvite(); pushPresence(true); renderInvite();
 }
-function joinMatch(p) {
+function joinMatch(v) {
   audioInit(); sfx.click();
-  match = { id: p.m.id, at: p.m.at, host: false, mode: p.m.mode };
+  clockOff = v.off; clockSet = true;
+  match = { id: v.mid, at: v.at, host: false, mode: v.mode };
   pushPresence(true); renderInvite();
 }
-function leaveMatch() { match = null; pushPresence(true); renderInvite(); }
+function leaveMatch() {
+  if (match && match.host && !match.started) netSend('cancel', { mid: match.id });
+  match = null; pushPresence(true); renderInvite();
+}
 function renderInvite() {
   if (!ONLINE) return;
   const now = Date.now(), idle = state === 'menu' || state === 'over';
@@ -1311,10 +1335,10 @@ function renderInvite() {
     acts = match.host ? ['now', 'leave'] : ['leave'];
   } else if (idle) {
     const inv = openInvite();
-    if (inv && (!match || inv.m.id !== match.id)) {
+    if (inv && (!match || inv.mid !== match.id)) {
       currentInvite = inv;
-      title = inv.name + ' lädt ein: ' + MODE_NAMES[inv.m.mode];
-      sub = 'Start in ' + Math.max(0, Math.ceil((inv.m.at - now) / 1000)) + ' s · ' + matchPlayers(inv.m.id).length + ' dabei';
+      title = inv.name + ' lädt ein: ' + MODE_NAMES[inv.mode];
+      sub = 'Start in ' + Math.max(0, Math.ceil((inv.at - (now + inv.off)) / 1000)) + ' s · ' + Math.max(1, matchPlayers(inv.mid).length) + ' dabei';
       acts = ['join'];
     }
   }
@@ -1349,16 +1373,17 @@ function matchTick() {
   if (!ONLINE) return;
   const now = Date.now(), cd = $('countdown');
   if (match && !match.host && !match.started) {
-    const h = net.peers.find(p => p.m && p.m.host && p.m.id === match.id);
-    if (h) { match.at = h.m.at; match.missing = 0; }
-    else {
-      // host gone (cancelled or left): give the lobby a moment to resync, then drop the round
-      match.missing = match.missing || now;
-      if (now - match.missing > 4000) { match = null; cd.hidden = true; pushPresence(true); ticker('Gemeinsame Runde', 'wurde abgesagt.'); }
-    }
+    const v = net.invites.get(match.id);
+    if (v && now - v.t < 4500) match.at = v.at;
+    else { match = null; cd.hidden = true; pushPresence(true); ticker('Gemeinsame Runde', 'wurde abgesagt.'); }
   }
+  if (match && match.host && !match.started && now - lastInv > 1500) sendInvite();
   if (match && match.host && now - lastClk > 2000) { lastClk = now; netSend('clk', { mid: match.id, hn: now }); }
-  if (now - lastLiveRender > 2000) { lastLiveRender = now; renderLive(); renderMatch(); }
+  if ((state === 'play' || state === 'pause') && now - lastLiveSent > 2000) {
+    lastLiveSent = now;
+    netSend('live', { by: net.uid, mid: match ? match.id : null, sc: score, hpm: round1(playedSecs >= 5 ? liveHpm() : 0), sec: Math.ceil(timeLeft) });
+  }
+  if (now - lastLiveRender > 1000) { lastLiveRender = now; mergeLive(); renderLive(); renderMatch(); }
   if (match && !match.started) {
     const rem = match.at - hostNow();
     if (rem <= 0) {
@@ -1381,7 +1406,7 @@ document.addEventListener('click', e => {
   if (!b) return;
   if (b.dataset.act === 'join' && currentInvite) joinMatch(currentInvite);
   else if (b.dataset.act === 'leave') leaveMatch();
-  else if (b.dataset.act === 'now' && match && match.host && !match.started) { match.at = Date.now() + 4000; pushPresence(true); renderInvite(); }
+  else if (b.dataset.act === 'now' && match && match.host && !match.started) { match.at = Date.now() + 4000; sendInvite(); renderInvite(); }
 });
 const toggleModes = e => { const pk = e.currentTarget.closest('.panel').querySelector('[data-modepick]'); pk.hidden = !pk.hidden; sfx.click(); if (!pk.hidden) pk.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' }); };
 $('hostBtn').addEventListener('click', toggleModes);
@@ -1492,7 +1517,7 @@ function awardNet(pc) {
 function netAim(sx, sy, shot) {
   if (!isShared() || state !== 'play') return;
   const now = Date.now();
-  if (!shot && now - lastAimSent < 200) return;
+  if (!shot && now - lastAimSent < 250) return;
   lastAimSent = now;
   netSend('aim', { mid: match.id, by: net.uid, name: nick || 'Anonym', x: round3((sx + cam) / worldW), y: round3(sy / H), s: shot ? 1 : 0 });
 }
@@ -1517,7 +1542,27 @@ function drawGhosts() {
   }
 }
 function onNet(event, d) {
-  if (!d || typeof d !== 'object' || !match || d.mid !== match.id) return;
+  if (!d || typeof d !== 'object') return;
+  if (event === 'inv') {
+    if (typeof d.mid !== 'string' || typeof d.by !== 'string' || d.by === net.uid || !isFinite(d.at) || !isFinite(d.hn)) return;
+    const prev = net.invites.get(d.mid), sample = num(d.hn) - Date.now();
+    net.invites.set(d.mid.slice(0, 40), { mid: d.mid.slice(0, 40), mode: d.mode === 'sky' ? 'sky' : 'solo', name: String(d.name || 'Jemand').slice(0, 20),
+      by: d.by, at: num(d.at), t: Date.now(), off: prev ? prev.off * 0.7 + sample * 0.3 : sample });
+    if (match && match.id === d.mid && !match.host) syncClock(num(d.hn));
+    renderInvite(); return;
+  }
+  if (event === 'cancel') {
+    if (typeof d.mid !== 'string') return;
+    net.invites.delete(d.mid);
+    if (match && match.id === d.mid && !match.host && !match.started) { match = null; $('countdown').hidden = true; pushPresence(true); ticker('Gemeinsame Runde', 'wurde abgesagt.'); }
+    renderInvite(); return;
+  }
+  if (event === 'live') {
+    if (typeof d.by !== 'string' || d.by === net.uid) return;
+    net.live[d.by] = { sc: Math.max(0, Math.round(num(d.sc))), hpm: Math.max(0, num(d.hpm)), sec: num(d.sec), t: Date.now() };
+    return;
+  }
+  if (!match || d.mid !== match.id) return;
   if (event === 'clk') { if (!match.host) syncClock(num(d.hn)); return; }
   if (!isShared() && event !== 'sp') return;
   if (event === 'sp') { if (!match.host) syncClock(num(d.hn)); if (match.started && match.mode === 'sky' && typeof d.id === 'string') addNetBird(d); }
@@ -1533,7 +1578,7 @@ document.addEventListener('visibilitychange', () => {
   else pushPresence(true);
 });
 addEventListener('pagehide', () => { try { net.ch && net.ch.untrack(); } catch (e) {} });
-setInterval(() => pushPresence(), 5000);
+
 
 function ticker(name, txt) {
   const box = $('ticker');
@@ -1608,7 +1653,7 @@ async function initOnline() {
     net.uid = deviceIdentity().id;
     loadBoard();
     const ch = net.ch = sb.channel('lobby', { config: { presence: { key: net.uid } } });
-    ['sp', 'cl', 'pp', 'aim', 'clk'].forEach(ev => ch.on('broadcast', { event: ev }, msg => onNet(ev, msg && msg.payload)));
+    ['sp', 'cl', 'pp', 'aim', 'clk', 'inv', 'cancel', 'live'].forEach(ev => ch.on('broadcast', { event: ev }, msg => onNet(ev, msg && msg.payload)));
     ch.on('presence', { event: 'sync' }, readPeers)
       .on('broadcast', { event: 'feat' }, msg => {
         const p = (msg && msg.payload) || {};
